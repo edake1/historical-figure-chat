@@ -1,0 +1,363 @@
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Send, Plus, X, Loader2, Crown, Quote, RefreshCw 
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { 
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger 
+} from '@/components/ui/dialog';
+import { historicalFigures, getFigureById } from '@/lib/figures';
+import { cn } from '@/lib/utils';
+import { useChatStore } from '@/stores/chat-store';
+import { useSettingsStore } from '@/stores/settings-store';
+import { FigureAvatar } from '@/components/figures/FigureAvatar';
+import { ChatBubble } from '@/components/chat/ChatBubble';
+
+export function ChatScreen() {
+  const { isDark, settings } = useSettingsStore();
+  const { 
+    selectedFigures, topic, messages, userInput, isGenerating, typingFigure,
+    setUserInput, removeFigure, addFigureToChat, sendMessage, generateMore,
+    toggleBookmark, addReaction
+  } = useChatStore();
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showFigureDialog, setShowFigureDialog] = useState(false);
+
+  // Auto scroll on new messages
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleAddFigure = (figure: typeof selectedFigures[0]) => {
+    addFigureToChat(figure, settings.soundEnabled);
+    setShowFigureDialog(false);
+  };
+
+  return (
+    <motion.div
+      key="chat"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="space-y-4"
+    >
+      {/* Active Figures Bar */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <Card className={cn(
+          "backdrop-blur-xl",
+          isDark 
+            ? "bg-white/[0.02] border-white/5"
+            : "bg-white border-slate-200 shadow-sm"
+        )}>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1">
+              <span className={cn(
+                "text-xs whitespace-nowrap font-medium",
+                isDark ? "text-white/40" : "text-slate-500"
+              )}>Active:</span>
+              <AnimatePresence mode="popLayout">
+                {selectedFigures.map((figure, i) => (
+                  <motion.div
+                    key={figure.id}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ delay: i * 0.05 }}
+                    className={cn(
+                      "flex items-center gap-2 rounded-full pl-1 pr-2 py-1 border",
+                      isDark 
+                        ? "bg-white/[0.03] border-white/5"
+                        : "bg-slate-50 border-slate-200"
+                    )}
+                  >
+                    <FigureAvatar figure={figure} size="sm" isDark={isDark} />
+                    <span className={cn(
+                      "text-xs whitespace-nowrap",
+                      isDark ? "text-white/70" : "text-slate-600"
+                    )}>{figure.name}</span>
+                    <button
+                      onClick={() => removeFigure(figure.id)}
+                      className={cn(
+                        "transition-colors",
+                        isDark 
+                          ? "text-white/30 hover:text-white/80"
+                          : "text-slate-400 hover:text-slate-600"
+                      )}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              
+              <Dialog open={showFigureDialog} onOpenChange={setShowFigureDialog}>
+                <DialogTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className={cn(
+                      "shrink-0 rounded-full",
+                      isDark 
+                        ? "text-white/40 hover:text-white hover:bg-white/5"
+                        : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                    )}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className={cn(
+                  "max-h-[80vh] overflow-y-auto backdrop-blur-xl",
+                  isDark 
+                    ? "bg-slate-900/95 border-white/10 text-white"
+                    : "bg-white border-slate-200 text-slate-900"
+                )}>
+                  <DialogHeader>
+                    <DialogTitle>Add Historical Figure</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid grid-cols-2 gap-2 mt-4">
+                    {historicalFigures
+                      .filter(f => !selectedFigures.some(sf => sf.id === f.id))
+                      .map(figure => (
+                        <Button
+                          key={figure.id}
+                          variant="outline"
+                          className={cn(
+                            "justify-start transition-all",
+                            isDark 
+                              ? "bg-white/[0.03] border-white/10 hover:bg-white/[0.08] hover:border-amber-500/30"
+                              : "bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-amber-300"
+                          )}
+                          onClick={() => handleAddFigure(figure)}
+                        >
+                          <FigureAvatar figure={figure} size="sm" isDark={isDark} />
+                          <span className={cn("ml-2", isDark ? "text-white/80" : "text-slate-700")}>{figure.name}</span>
+                        </Button>
+                      ))
+                    }
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Topic Display */}
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.1 }}
+        className="flex items-center justify-center gap-2 py-2"
+      >
+        <Badge 
+          variant="outline" 
+          className={cn(
+            "text-sm px-4 py-1.5 rounded-full",
+            isDark 
+              ? "bg-amber-500/10 border-amber-500/20 text-amber-200"
+              : "bg-amber-50 border-amber-200 text-amber-700"
+          )}
+        >
+          <Quote className="w-3 h-3 mr-1.5" />
+          {topic}
+        </Badge>
+      </motion.div>
+
+      {/* Chat Area */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <Card className={cn(
+          "relative overflow-hidden backdrop-blur-xl",
+          isDark 
+            ? "bg-white/[0.02] border-white/5"
+            : "bg-white border-slate-200 shadow-sm"
+        )}>
+          <div className={cn(
+            "absolute top-0 left-0 right-0 h-32 bg-gradient-to-b to-transparent pointer-events-none",
+            isDark ? "from-amber-500/5" : "from-amber-100/50"
+          )} />
+          
+          <CardContent className="relative p-0">
+            <ScrollArea className="h-[50vh] sm:h-[55vh] lg:h-[500px] p-4 sm:p-6" ref={scrollRef}>
+              <div className="space-y-4">
+                <AnimatePresence mode="popLayout">
+                  {messages.map((message, index) => {
+                    const figure = getFigureById(message.figureId);
+                    if (message.figureId === 'moderator') {
+                      return (
+                        <motion.div
+                          key={message.id}
+                          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          className="flex justify-end"
+                        >
+                          <div className={cn(
+                            "rounded-2xl p-4 max-w-[85%] sm:max-w-[75%] shadow-lg",
+                            isDark 
+                              ? "bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/20 shadow-amber-500/5"
+                              : "bg-gradient-to-br from-amber-100 to-orange-50 border border-amber-200"
+                          )}>
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <Crown className="w-3.5 h-3.5 text-amber-500" />
+                              <span className="text-xs text-amber-500 font-semibold">You (Moderator)</span>
+                              {settings.timestampsEnabled && (
+                                <span className={cn("text-xs", isDark ? "text-white/30" : "text-slate-400")}>
+                                  {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                            </div>
+                            <p className={cn("text-sm", isDark ? "text-white/90" : "text-slate-700")}>{message.content}</p>
+                          </div>
+                        </motion.div>
+                      );
+                    }
+                    return (
+                      <ChatBubble 
+                        key={message.id} 
+                        message={message} 
+                        figure={figure}
+                        index={index}
+                        onBookmark={() => toggleBookmark(message, settings.soundEnabled)}
+                        onReact={(emoji) => addReaction(message.id, emoji)}
+                        showTimestamps={settings.timestampsEnabled}
+                        isDark={isDark}
+                      />
+                    );
+                  })}
+                </AnimatePresence>
+                
+                {/* Typing indicator */}
+                {typingFigure && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-3 p-4"
+                  >
+                    <div className={cn(
+                      "flex items-center gap-3 px-4 py-2 rounded-full border",
+                      isDark 
+                        ? "bg-white/[0.03] border-white/5"
+                        : "bg-slate-50 border-slate-200"
+                    )}>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                      >
+                        <Loader2 className="w-4 h-4 text-amber-400" />
+                      </motion.div>
+                      <span className={cn(
+                        "text-sm",
+                        isDark ? "text-white/50" : "text-slate-500"
+                      )}>{typingFigure} is thinking...</span>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Loading state */}
+                {isGenerating && messages.every(m => !m.isStreaming) && !typingFigure && (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex items-center justify-center py-8"
+                  >
+                    <div className={cn(
+                      "flex items-center gap-3 px-4 py-2 rounded-full border",
+                      isDark 
+                        ? "bg-white/[0.03] border-white/5"
+                        : "bg-slate-50 border-slate-200"
+                    )}>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                      >
+                        <Loader2 className="w-5 h-5 text-amber-400" />
+                      </motion.div>
+                      <span className={cn(
+                        "text-sm",
+                        isDark ? "text-white/50" : "text-slate-500"
+                      )}>A historical figure is thinking...</span>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Input Area */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Card className={cn(
+          "backdrop-blur-xl",
+          isDark 
+            ? "bg-white/[0.02] border-white/5"
+            : "bg-white border-slate-200 shadow-sm"
+        )}>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex gap-2 sm:gap-3">
+              <Button
+                variant="outline"
+                onClick={generateMore}
+                disabled={isGenerating}
+                className={cn(
+                  "shrink-0 transition-all",
+                  isDark 
+                    ? "border-white/10 hover:bg-white/5 hover:border-amber-500/30"
+                    : "border-slate-200 hover:bg-slate-50 hover:border-amber-300"
+                )}
+              >
+                {isGenerating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                <span className="ml-2 hidden sm:inline">Continue</span>
+              </Button>
+              <Input
+                placeholder="Jump in as moderator..."
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage(settings.soundEnabled)}
+                className={cn(
+                  "rounded-xl transition-all",
+                  isDark 
+                    ? "bg-white/[0.03] border-white/10 text-white placeholder:text-white/30 focus:border-amber-500/50 focus:ring-amber-500/20"
+                    : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-amber-400 focus:ring-amber-400/20"
+                )}
+                disabled={isGenerating}
+              />
+              <Button
+                onClick={() => sendMessage(settings.soundEnabled)}
+                disabled={!userInput.trim() || isGenerating}
+                className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 shrink-0 rounded-xl shadow-lg shadow-amber-500/20 transition-all"
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </motion.div>
+  );
+}

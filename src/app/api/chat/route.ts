@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import ZAI from 'z-ai-web-dev-sdk';
+import OpenAI from 'openai';
 import { getFigureById, HistoricalFigure } from '@/lib/figures';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 interface ConversationTurn {
   figureId: string;
@@ -105,15 +109,13 @@ export async function POST(request: NextRequest) {
 
     const messages = buildGroupChatPrompt(figures, topic, updatedHistory, respondingFigure);
 
-    // Create ZAI instance
-    const zai = await ZAI.create();
-
     // Create streaming response
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          const completion = await zai.chat.completions.create({
+          const completion = await openai.chat.completions.create({
+            model: 'gpt-4o',
             messages,
             temperature: 0.8,
             max_tokens: 300,
@@ -177,8 +179,6 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'No valid figures found' }, { status: 400 });
     }
 
-    const zai = await ZAI.create();
-
     // Generate responses from all figures in sequence
     const responses: { figureId: string; content: string }[] = [];
     let currentHistory = [...conversationHistory];
@@ -187,7 +187,8 @@ export async function PUT(request: NextRequest) {
     for (const figure of figures) {
       const messages = buildGroupChatPrompt(figures, topic, currentHistory, figure);
       
-      const completion = await zai.chat.completions.create({
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
         messages,
         temperature: 0.8,
         max_tokens: 300,

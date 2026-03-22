@@ -14,24 +14,18 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
-  icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
-  },
+  title: "Historical Figure Group Chat — AI-Powered Conversations Through Time",
+  description: "What if Einstein, Cleopatra, and Shakespeare were in a group chat? Select historical figures, choose a topic, and watch them debate in real-time with distinct personalities.",
+  keywords: ["historical figures", "AI chat", "group chat", "history", "education", "Einstein", "Cleopatra", "Shakespeare"],
   openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
+    title: "Historical Figure Group Chat",
+    description: "AI-powered conversations between history's greatest minds",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
+    title: "Historical Figure Group Chat",
+    description: "AI-powered conversations between history's greatest minds",
   },
 };
 

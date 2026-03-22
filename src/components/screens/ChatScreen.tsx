@@ -384,28 +384,26 @@ export function ChatScreen() {
               </div>
 
               {/* TTS toggle */}
-              <Button
-                variant="ghost"
-                size="sm"
+              <button
                 onClick={toggleTTS}
-                title={settings.ttsEnabled ? "Mute voices" : "Enable voices"}
                 className={cn(
-                  "shrink-0 ml-auto",
+                  "shrink-0 ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all",
                   settings.ttsEnabled
                     ? isDark
-                      ? "text-amber-300 hover:text-amber-200"
-                      : "text-amber-600 hover:text-amber-700"
+                      ? "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                      : "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
                     : isDark
-                      ? "text-white/30 hover:text-white/60"
-                      : "text-slate-400 hover:text-slate-600"
+                      ? "border-white/10 text-white/30 hover:text-white/60 hover:bg-white/5"
+                      : "border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50"
                 )}
               >
                 {settings.ttsEnabled ? (
-                  <Volume2 className="w-4 h-4" />
+                  <Volume2 className="w-3.5 h-3.5" />
                 ) : (
-                  <VolumeX className="w-4 h-4" />
+                  <VolumeX className="w-3.5 h-3.5" />
                 )}
-              </Button>
+                <span className="hidden sm:inline">{settings.ttsEnabled ? 'Audio On' : 'Audio Off'}</span>
+              </button>
             </div>
 
             {/* Input row */}

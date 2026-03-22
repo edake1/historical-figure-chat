@@ -69,19 +69,34 @@ export const useChatStore = create<ChatStore>((set, get) => {
   let abortController: AbortController | null = null;
   let autoPlayTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const getAutoPlayDelay = (): number => {
+  const getAutoPlayDelay = (lastMessageContent?: string): number => {
     const settingsStore = require('./settings-store').useSettingsStore.getState();
     const speed = settingsStore.settings.autoPlaySpeed;
-    switch (speed) {
-      case 'relaxed': return 3000;
-      case 'fast': return 800;
-      default: return 1500;
+    const ttsEnabled = settingsStore.settings.ttsEnabled;
+
+    // Base delay between turns
+    const baseDelay = speed === 'relaxed' ? 2000 : speed === 'fast' ? 500 : 1000;
+
+    // When TTS is off, add reading time based on message length
+    // ~200 WPM reading speed = ~300ms per word
+    if (!ttsEnabled && lastMessageContent) {
+      const wordCount = lastMessageContent.split(/\s+/).length;
+      const readingMs = wordCount * 300;
+      const speedMultiplier = speed === 'relaxed' ? 1.3 : speed === 'fast' ? 0.6 : 1;
+      return baseDelay + Math.round(readingMs * speedMultiplier);
     }
+
+    return baseDelay;
   };
 
   const scheduleAutoPlayNext = () => {
     const settingsStore = require('./settings-store').useSettingsStore.getState();
     if (!settingsStore.settings.autoPlay || !get().isAutoPlaying) return;
+
+    // Get the last message content for reading-time calculation
+    const messages = get().messages;
+    const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+    const lastContent = lastMsg?.figureId !== 'moderator' ? lastMsg?.content : undefined;
     
     autoPlayTimer = setTimeout(async () => {
       if (!get().isAutoPlaying || get().isGenerating) return;
@@ -91,7 +106,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
       if (get().isAutoPlaying) {
         scheduleAutoPlayNext();
       }
-    }, getAutoPlayDelay());
+    }, getAutoPlayDelay(lastContent));
   };
 
   const speakIfEnabled = async (text: string, figureId: string) => {

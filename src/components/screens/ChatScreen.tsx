@@ -3,8 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Send, Plus, X, Loader2, Crown, Quote, Play, Pause, Volume2, VolumeX,
-  Rabbit, Turtle, Timer
+  Send, Plus, X, Crown, Quote, Play, Pause, Volume2, VolumeX
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -198,7 +197,7 @@ export function ChatScreen() {
           
           <CardContent className="relative p-0">
             <ScrollArea className="h-[50vh] sm:h-[55vh] lg:h-[500px] p-4 sm:p-6" ref={scrollRef}>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <AnimatePresence mode="popLayout">
                   {messages.map((message, index) => {
                     const figure = getFigureById(message.figureId);
@@ -206,27 +205,33 @@ export function ChatScreen() {
                       return (
                         <motion.div
                           key={message.id}
-                          initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 20 }}
+                          transition={{ type: "spring", stiffness: 120, damping: 18 }}
                           className="flex justify-end"
                         >
                           <div className={cn(
-                            "rounded-2xl p-4 max-w-[85%] sm:max-w-[75%] shadow-lg",
+                            "rounded-2xl p-4 max-w-[85%] sm:max-w-[70%]",
                             isDark 
-                              ? "bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/20 shadow-amber-500/5"
-                              : "bg-gradient-to-br from-amber-100 to-orange-50 border border-amber-200"
+                              ? "bg-gradient-to-br from-amber-500/15 to-orange-500/5 border border-amber-500/15"
+                              : "bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/60"
                           )}>
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <Crown className="w-3.5 h-3.5 text-amber-500" />
-                              <span className="text-xs text-amber-500 font-semibold">You (Moderator)</span>
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                                <Crown className="w-2.5 h-2.5 text-white" />
+                              </div>
+                              <span className={cn(
+                                "text-xs font-semibold",
+                                isDark ? "text-amber-300/80" : "text-amber-600"
+                              )}>You (Moderator)</span>
                               {settings.timestampsEnabled && (
-                                <span className={cn("text-xs", isDark ? "text-white/30" : "text-slate-400")}>
+                                <span className={cn("text-[10px] ml-auto", isDark ? "text-white/20" : "text-slate-300")}>
                                   {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               )}
                             </div>
-                            <p className={cn("text-sm", isDark ? "text-white/90" : "text-slate-700")}>{message.content}</p>
+                            <p className={cn("text-sm leading-relaxed", isDark ? "text-white/85" : "text-slate-700")}>{message.content}</p>
                           </div>
                         </motion.div>
                       );
@@ -253,24 +258,23 @@ export function ChatScreen() {
                   <motion.div 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center gap-3 p-4"
+                    className="flex items-center gap-3 px-2"
                   >
                     <div className={cn(
-                      "flex items-center gap-3 px-4 py-2 rounded-full border",
+                      "flex items-center gap-3 px-4 py-2.5 rounded-2xl border",
                       isDark 
                         ? "bg-white/[0.03] border-white/5"
                         : "bg-slate-50 border-slate-200"
                     )}>
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                      >
-                        <Loader2 className="w-4 h-4 text-amber-400" />
-                      </motion.div>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="typing-dot bg-amber-400" />
+                        <span className="typing-dot bg-amber-400" />
+                        <span className="typing-dot bg-amber-400" />
+                      </span>
                       <span className={cn(
-                        "text-sm",
-                        isDark ? "text-white/50" : "text-slate-500"
-                      )}>{typingFigure} is thinking...</span>
+                        "text-sm font-medium",
+                        isDark ? "text-white/40" : "text-slate-400"
+                      )}>{typingFigure} is thinking</span>
                     </div>
                   </motion.div>
                 )}
@@ -280,24 +284,23 @@ export function ChatScreen() {
                   <motion.div 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="flex items-center justify-center py-8"
+                    className="flex items-center justify-center py-6"
                   >
                     <div className={cn(
-                      "flex items-center gap-3 px-4 py-2 rounded-full border",
+                      "flex items-center gap-3 px-5 py-2.5 rounded-2xl border",
                       isDark 
                         ? "bg-white/[0.03] border-white/5"
                         : "bg-slate-50 border-slate-200"
                     )}>
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                      >
-                        <Loader2 className="w-5 h-5 text-amber-400" />
-                      </motion.div>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="typing-dot bg-amber-400" />
+                        <span className="typing-dot bg-amber-400" />
+                        <span className="typing-dot bg-amber-400" />
+                      </span>
                       <span className={cn(
-                        "text-sm",
-                        isDark ? "text-white/50" : "text-slate-500"
-                      )}>A historical figure is thinking...</span>
+                        "text-sm font-medium",
+                        isDark ? "text-white/40" : "text-slate-400"
+                      )}>Someone is formulating a thought...</span>
                     </div>
                   </motion.div>
                 )}
@@ -353,20 +356,19 @@ export function ChatScreen() {
 
               {/* Speed selector */}
               <div className={cn(
-                "flex items-center rounded-lg border overflow-hidden",
+                "flex items-center rounded-lg border overflow-hidden text-xs font-medium",
                 isDark ? "border-white/10" : "border-slate-200"
               )}>
                 {([
-                  { speed: 'relaxed' as AutoPlaySpeed, icon: Turtle, label: 'Relaxed' },
-                  { speed: 'normal' as AutoPlaySpeed, icon: Timer, label: 'Normal' },
-                  { speed: 'fast' as AutoPlaySpeed, icon: Rabbit, label: 'Fast' },
-                ] as const).map(({ speed, icon: Icon, label }) => (
+                  { speed: 'relaxed' as AutoPlaySpeed, label: 'Slow' },
+                  { speed: 'normal' as AutoPlaySpeed, label: '1×' },
+                  { speed: 'fast' as AutoPlaySpeed, label: 'Fast' },
+                ] as const).map(({ speed, label }) => (
                   <button
                     key={speed}
                     onClick={() => setAutoPlaySpeed(speed)}
-                    title={label}
                     className={cn(
-                      "px-2 py-1.5 transition-all",
+                      "px-3 py-1.5 transition-all",
                       settings.autoPlaySpeed === speed
                         ? isDark
                           ? "bg-amber-500/20 text-amber-300"
@@ -376,7 +378,7 @@ export function ChatScreen() {
                           : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
                     )}
                   >
-                    <Icon className="w-3.5 h-3.5" />
+                    {label}
                   </button>
                 ))}
               </div>

@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { 
   MessageCircle, Share2, Save, Download, Trash2, 
   History, Bookmark, Moon, Sun, Volume2, VolumeX,
-  Clock
+  Clock, ArrowLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -71,20 +71,42 @@ export function Header() {
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center gap-3"
           >
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl blur-lg opacity-50" />
-              <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
-                <MessageCircle className="w-5 h-5 text-white" />
+            {isChatStarted && (
+              <button
+                onClick={resetConversation}
+                className={cn(
+                  "p-2 rounded-xl transition-all group",
+                  isDark 
+                    ? "hover:bg-white/5 text-white/40 hover:text-white" 
+                    : "hover:bg-slate-100 text-slate-400 hover:text-slate-700"
+                )}
+                title="End conversation"
+              >
+                <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-0.5" />
+              </button>
+            )}
+            <button
+              onClick={isChatStarted ? resetConversation : undefined}
+              className={cn(
+                "flex items-center gap-3",
+                isChatStarted && "cursor-pointer"
+              )}
+            >
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl blur-lg opacity-50" />
+                <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
+                  <MessageCircle className="w-5 h-5 text-white" />
+                </div>
               </div>
-            </div>
-            <div>
-              <h1 className="font-bold text-lg tracking-tight">
-                <span className="bg-gradient-to-r from-amber-200 via-yellow-100 to-orange-200 bg-clip-text text-transparent">
-                  Historical Chat
-                </span>
-              </h1>
-              <p className={cn("text-xs", isDark ? "text-white/40" : "text-slate-500")}>Where history comes alive</p>
-            </div>
+              <div>
+                <h1 className="font-bold text-lg tracking-tight">
+                  <span className="bg-gradient-to-r from-amber-200 via-yellow-100 to-orange-200 bg-clip-text text-transparent">
+                    Historical Chat
+                  </span>
+                </h1>
+                <p className={cn("text-xs", isDark ? "text-white/40" : "text-slate-500")}>Where history comes alive</p>
+              </div>
+            </button>
           </motion.div>
           
           <motion.div 

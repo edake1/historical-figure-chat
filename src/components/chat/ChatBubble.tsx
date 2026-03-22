@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { BookmarkCheck, Bookmark, Heart, Clock, Loader2 } from 'lucide-react';
+import { BookmarkCheck, Bookmark, Heart, Clock, Loader2, Volume2 } from 'lucide-react';
 import { HistoricalFigure } from '@/lib/figures';
 import { ChatMessage, REACTION_EMOJIS } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -12,16 +12,20 @@ export function ChatBubble({
   message, 
   figure, 
   index, 
+  isSpeaking = false,
   onBookmark,
   onReact,
+  onReplay,
   showTimestamps,
   isDark = true
 }: { 
   message: ChatMessage; 
   figure?: HistoricalFigure; 
   index: number;
+  isSpeaking?: boolean;
   onBookmark: () => void;
   onReact: (emoji: string) => void;
+  onReplay?: () => void;
   showTimestamps: boolean;
   isDark?: boolean;
 }) {
@@ -78,7 +82,7 @@ export function ChatBubble({
         style={{ backgroundColor: figure.color }}
       />
       
-      <FigureAvatar figure={figure} showPulse={message.isStreaming} isDark={isDark} />
+      <FigureAvatar figure={figure} showPulse={message.isStreaming || isSpeaking} isDark={isDark} />
       
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
@@ -115,6 +119,16 @@ export function ChatBubble({
             >
               <Loader2 className="w-3 h-3 animate-spin text-amber-400" />
               <span className="text-xs text-amber-400/80">thinking...</span>
+            </motion.div>
+          )}
+          {isSpeaking && !message.isStreaming && (
+            <motion.div
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 1, repeat: Infinity }}
+              className="flex items-center gap-1"
+            >
+              <Volume2 className="w-3 h-3 text-amber-400" />
+              <span className="text-xs text-amber-400/80">speaking...</span>
             </motion.div>
           )}
         </div>
@@ -154,6 +168,22 @@ export function ChatBubble({
         "absolute right-2 top-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity",
         isDark ? "bg-slate-900/80" : "bg-white/90"
       )}>
+        {/* Replay TTS button */}
+        {onReplay && !message.isStreaming && (
+          <button
+            onClick={onReplay}
+            title="Replay speech"
+            className={cn(
+              "p-1.5 rounded-lg transition-colors",
+              isDark 
+                ? "text-white/40 hover:text-amber-400 hover:bg-white/5"
+                : "text-slate-400 hover:text-amber-500 hover:bg-slate-100"
+            )}
+          >
+            <Volume2 className="w-4 h-4" />
+          </button>
+        )}
+
         {/* Bookmark button */}
         <button
           onClick={onBookmark}

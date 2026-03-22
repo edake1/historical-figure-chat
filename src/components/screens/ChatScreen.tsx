@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Send, Plus, X, Loader2, Crown, Quote, RefreshCw 
+  Send, Plus, X, Loader2, Crown, Quote, Play, Pause, Volume2, VolumeX,
+  Rabbit, Turtle, Timer
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,15 +18,17 @@ import { historicalFigures, getFigureById } from '@/lib/figures';
 import { cn } from '@/lib/utils';
 import { useChatStore } from '@/stores/chat-store';
 import { useSettingsStore } from '@/stores/settings-store';
+import { AutoPlaySpeed } from '@/lib/types';
 import { FigureAvatar } from '@/components/figures/FigureAvatar';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 
 export function ChatScreen() {
-  const { isDark, settings } = useSettingsStore();
+  const { isDark, settings, toggleTTS, setAutoPlaySpeed } = useSettingsStore();
   const { 
     selectedFigures, topic, messages, userInput, isGenerating, typingFigure,
-    setUserInput, removeFigure, addFigureToChat, sendMessage, generateMore,
-    toggleBookmark, addReaction
+    speakingFigure, isAutoPlaying,
+    setUserInput, removeFigure, addFigureToChat, sendMessage, startAutoPlay,
+    stopAutoPlay, replayMessage, toggleBookmark, addReaction
   } = useChatStore();
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -234,8 +237,10 @@ export function ChatScreen() {
                         message={message} 
                         figure={figure}
                         index={index}
+                        isSpeaking={speakingFigure === message.figureId}
                         onBookmark={() => toggleBookmark(message, settings.soundEnabled)}
                         onReact={(emoji) => addReaction(message.id, emoji)}
+                        onReplay={() => replayMessage(message)}
                         showTimestamps={settings.timestampsEnabled}
                         isDark={isDark}
                       />
@@ -314,26 +319,95 @@ export function ChatScreen() {
             ? "bg-white/[0.02] border-white/5"
             : "bg-white border-slate-200 shadow-sm"
         )}>
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex gap-2 sm:gap-3">
+          <CardContent className="p-3 sm:p-4 space-y-3">
+            {/* Playback controls row */}
+            <div className="flex items-center gap-2">
+              {/* Play / Pause */}
               <Button
                 variant="outline"
-                onClick={generateMore}
-                disabled={isGenerating}
+                size="sm"
+                onClick={isAutoPlaying ? stopAutoPlay : startAutoPlay}
                 className={cn(
-                  "shrink-0 transition-all",
-                  isDark 
-                    ? "border-white/10 hover:bg-white/5 hover:border-amber-500/30"
-                    : "border-slate-200 hover:bg-slate-50 hover:border-amber-300"
+                  "shrink-0 gap-1.5 transition-all",
+                  isAutoPlaying
+                    ? isDark
+                      ? "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                      : "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                    : isDark 
+                      ? "border-white/10 hover:bg-white/5 hover:border-amber-500/30"
+                      : "border-slate-200 hover:bg-slate-50 hover:border-amber-300"
                 )}
               >
-                {isGenerating ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                {isAutoPlaying ? (
+                  <>
+                    <Pause className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline text-xs">Pause</span>
+                  </>
                 ) : (
-                  <RefreshCw className="w-4 h-4" />
+                  <>
+                    <Play className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline text-xs">Play</span>
+                  </>
                 )}
-                <span className="ml-2 hidden sm:inline">Continue</span>
               </Button>
+
+              {/* Speed selector */}
+              <div className={cn(
+                "flex items-center rounded-lg border overflow-hidden",
+                isDark ? "border-white/10" : "border-slate-200"
+              )}>
+                {([
+                  { speed: 'relaxed' as AutoPlaySpeed, icon: Turtle, label: 'Relaxed' },
+                  { speed: 'normal' as AutoPlaySpeed, icon: Timer, label: 'Normal' },
+                  { speed: 'fast' as AutoPlaySpeed, icon: Rabbit, label: 'Fast' },
+                ] as const).map(({ speed, icon: Icon, label }) => (
+                  <button
+                    key={speed}
+                    onClick={() => setAutoPlaySpeed(speed)}
+                    title={label}
+                    className={cn(
+                      "px-2 py-1.5 transition-all",
+                      settings.autoPlaySpeed === speed
+                        ? isDark
+                          ? "bg-amber-500/20 text-amber-300"
+                          : "bg-amber-100 text-amber-700"
+                        : isDark
+                          ? "text-white/30 hover:text-white/60 hover:bg-white/5"
+                          : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                    )}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                  </button>
+                ))}
+              </div>
+
+              {/* TTS toggle */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleTTS}
+                title={settings.ttsEnabled ? "Mute voices" : "Enable voices"}
+                className={cn(
+                  "shrink-0 ml-auto",
+                  settings.ttsEnabled
+                    ? isDark
+                      ? "text-amber-300 hover:text-amber-200"
+                      : "text-amber-600 hover:text-amber-700"
+                    : isDark
+                      ? "text-white/30 hover:text-white/60"
+                      : "text-slate-400 hover:text-slate-600"
+                )}
+              >
+                {settings.ttsEnabled ? (
+                  <Volume2 className="w-4 h-4" />
+                ) : (
+                  <VolumeX className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+
+            {/* Input row */}
+            <div className="flex gap-2 sm:gap-3">
               <Input
                 placeholder="Jump in as moderator..."
                 value={userInput}

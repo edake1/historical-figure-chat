@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { ChatMessage, ConversationTurn, SavedConversation, BookmarkItem, STORAGE_KEYS } from '@/lib/types';
 import { HistoricalFigure, getFigureById } from '@/lib/figures';
 import { soundEngine } from '@/lib/sound-engine';
+import { ttsEngine } from '@/lib/tts-engine';
 
 interface ChatStore {
   // Core state
@@ -12,6 +13,8 @@ interface ChatStore {
   isChatStarted: boolean;
   isGenerating: boolean;
   typingFigure: string | null;
+  speakingFigure: string | null;
+  isAutoPlaying: boolean;
 
   // Saved data
   savedConversations: SavedConversation[];
@@ -39,6 +42,9 @@ interface ChatStore {
   sendMessage: (soundEnabled: boolean) => Promise<void>;
   generateMore: () => Promise<void>;
   resetConversation: () => void;
+  startAutoPlay: () => void;
+  stopAutoPlay: () => void;
+  replayMessage: (message: ChatMessage) => void;
 
   // Message mutations
   addReaction: (messageId: string, emoji: string) => void;
@@ -61,6 +67,46 @@ interface ChatStore {
 export const useChatStore = create<ChatStore>((set, get) => {
   // Internal ref for abort controller
   let abortController: AbortController | null = null;
+  let autoPlayTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const getAutoPlayDelay = (): number => {
+    const settingsStore = require('./settings-store').useSettingsStore.getState();
+    const speed = settingsStore.settings.autoPlaySpeed;
+    switch (speed) {
+      case 'relaxed': return 3000;
+      case 'fast': return 800;
+      default: return 1500;
+    }
+  };
+
+  const scheduleAutoPlayNext = () => {
+    const settingsStore = require('./settings-store').useSettingsStore.getState();
+    if (!settingsStore.settings.autoPlay || !get().isAutoPlaying) return;
+    
+    autoPlayTimer = setTimeout(async () => {
+      if (!get().isAutoPlaying || get().isGenerating) return;
+      set({ isGenerating: true });
+      await streamResponse();
+      // After response finishes, schedule the next one
+      if (get().isAutoPlaying) {
+        scheduleAutoPlayNext();
+      }
+    }, getAutoPlayDelay());
+  };
+
+  const speakIfEnabled = async (text: string, figureId: string) => {
+    const settingsStore = require('./settings-store').useSettingsStore.getState();
+    if (settingsStore.settings.ttsEnabled) {
+      set({ speakingFigure: figureId });
+      try {
+        await ttsEngine.speak(text, figureId);
+      } catch {
+        // TTS failure shouldn't break the flow
+      } finally {
+        set({ speakingFigure: null });
+      }
+    }
+  };
 
   const streamResponse = async (message?: string) => {
     abortController = new AbortController();
@@ -145,13 +191,17 @@ export const useChatStore = create<ChatStore>((set, get) => {
                 }));
               } else if (data.type === 'done') {
                 const capturedId = messageId;
+                const capturedFigureId = currentFigureId;
+                const capturedContent = data.fullContent;
                 set(state => ({
                   messages: state.messages.map(m => 
                     m.id === capturedId 
-                      ? { ...m, isStreaming: false, content: data.fullContent }
+                      ? { ...m, isStreaming: false, content: capturedContent }
                       : m
                   )
                 }));
+                // Speak the completed message
+                await speakIfEnabled(capturedContent, capturedFigureId);
               }
             } catch {
               // Skip invalid JSON
@@ -178,6 +228,8 @@ export const useChatStore = create<ChatStore>((set, get) => {
     isChatStarted: false,
     isGenerating: false,
     typingFigure: null,
+    speakingFigure: null,
+    isAutoPlaying: false,
     savedConversations: [],
     bookmarks: [],
     showConfetti: false,
@@ -237,50 +289,111 @@ export const useChatStore = create<ChatStore>((set, get) => {
         }
       }
 
-      // Generate initial responses
+      // Stream each figure's initial response sequentially (typewriter effect)
       try {
-        const response = await fetch('/api/chat', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            figureIds: selectedFigures.map(f => f.id),
-            topic,
-            conversationHistory: []
-          })
-        });
+        for (const figure of selectedFigures) {
+          // Build conversation history from messages generated so far
+          const currentMessages = get().messages;
+          const conversationHistory: ConversationTurn[] = currentMessages.map(m => ({
+            figureId: m.figureId,
+            content: m.content
+          }));
 
-        if (!response.ok) throw new Error('Failed to generate responses');
+          const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              figureIds: selectedFigures.map(f => f.id),
+              topic,
+              conversationHistory,
+              respondAsFigureId: figure.id
+            })
+          });
 
-        const data = await response.json();
-        
-        for (let i = 0; i < data.responses.length; i++) {
-          const { figureId, content } = data.responses[i];
-          await new Promise(resolve => setTimeout(resolve, 300));
-          
-          const figure = getFigureById(figureId);
-          if (figure) {
-            set({ typingFigure: figure.name });
-            if (soundEnabled) {
-              soundEngine.playFigureSpeak();
+          if (!response.ok) throw new Error('Failed to get response');
+
+          const reader = response.body?.getReader();
+          if (!reader) continue;
+
+          const decoder = new TextDecoder();
+          let messageId = '';
+          let currentContent = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const text = decoder.decode(value);
+            const lines = text.split('\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+
+                  if (data.type === 'figure') {
+                    messageId = `${Date.now()}-${Math.random()}`;
+                    currentContent = '';
+
+                    set({ typingFigure: figure.name });
+                    if (soundEnabled) {
+                      soundEngine.playFigureSpeak();
+                    }
+
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                    set({ typingFigure: null });
+
+                    set(state => ({
+                      messages: [...state.messages, {
+                        id: messageId,
+                        figureId: figure.id,
+                        content: '',
+                        isStreaming: true,
+                        timestamp: new Date()
+                      }]
+                    }));
+                  } else if (data.type === 'token') {
+                    currentContent += data.content;
+                    const capturedId = messageId;
+                    const capturedContent = currentContent;
+                    set(state => ({
+                      messages: state.messages.map(m =>
+                        m.id === capturedId
+                          ? { ...m, content: capturedContent }
+                          : m
+                      )
+                    }));
+                  } else if (data.type === 'done') {
+                    const capturedId = messageId;
+                    const capturedFigureId = figure.id;
+                    const capturedContent = data.fullContent;
+                    set(state => ({
+                      messages: state.messages.map(m =>
+                        m.id === capturedId
+                          ? { ...m, isStreaming: false, content: capturedContent }
+                          : m
+                      )
+                    }));
+                    // Speak the completed message
+                    await speakIfEnabled(capturedContent, capturedFigureId);
+                  }
+                } catch {
+                  // Skip invalid JSON
+                }
+              }
             }
           }
-
-          await new Promise(resolve => setTimeout(resolve, 500));
-          set({ typingFigure: null });
-          
-          set(state => ({
-            messages: [...state.messages, {
-              id: `${Date.now()}-${i}`,
-              figureId,
-              content,
-              timestamp: new Date()
-            }]
-          }));
         }
       } catch (error) {
         console.error('Error generating responses:', error);
       } finally {
         set({ isGenerating: false });
+        // Start auto-play loop after initial conversation
+        const settingsStore = require('./settings-store').useSettingsStore.getState();
+        if (settingsStore.settings.autoPlay) {
+          set({ isAutoPlaying: true });
+          scheduleAutoPlayNext();
+        }
       }
     },
 
@@ -289,6 +402,13 @@ export const useChatStore = create<ChatStore>((set, get) => {
       if (!userInput.trim() || isGenerating) return;
 
       const userMessage = userInput.trim();
+      // Pause auto-play while user sends a message
+      const wasAutoPlaying = get().isAutoPlaying;
+      if (wasAutoPlaying) {
+        if (autoPlayTimer) clearTimeout(autoPlayTimer);
+        autoPlayTimer = null;
+      }
+      
       set({ userInput: '', isGenerating: true });
 
       if (soundEnabled) {
@@ -305,24 +425,61 @@ export const useChatStore = create<ChatStore>((set, get) => {
       }));
 
       await streamResponse(userMessage);
+      
+      // Resume auto-play after the figure responds
+      if (wasAutoPlaying && get().isAutoPlaying) {
+        scheduleAutoPlayNext();
+      }
     },
 
     generateMore: async () => {
       if (get().isGenerating) return;
       set({ isGenerating: true });
       await streamResponse();
+      // If auto-play is on, continue the loop
+      if (get().isAutoPlaying) {
+        scheduleAutoPlayNext();
+      }
     },
 
     resetConversation: () => {
       if (abortController) {
         abortController.abort();
       }
+      if (autoPlayTimer) {
+        clearTimeout(autoPlayTimer);
+        autoPlayTimer = null;
+      }
+      ttsEngine.stop();
       set({
         messages: [],
         isChatStarted: false,
         topic: '',
         isGenerating: false,
+        isAutoPlaying: false,
+        speakingFigure: null,
       });
+    },
+
+    startAutoPlay: () => {
+      set({ isAutoPlaying: true });
+      if (!get().isGenerating) {
+        scheduleAutoPlayNext();
+      }
+    },
+
+    stopAutoPlay: () => {
+      if (autoPlayTimer) {
+        clearTimeout(autoPlayTimer);
+        autoPlayTimer = null;
+      }
+      ttsEngine.stop();
+      set({ isAutoPlaying: false, speakingFigure: null });
+    },
+
+    replayMessage: (message) => {
+      if (message.figureId === 'moderator') return;
+      speakIfEnabled(message.content, message.figureId);
     },
 
     // Message mutations

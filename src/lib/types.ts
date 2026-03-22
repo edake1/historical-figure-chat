@@ -33,9 +33,14 @@ export interface BookmarkItem {
   conversationId?: string;
 }
 
+export type AutoPlaySpeed = 'relaxed' | 'normal' | 'fast';
+
 export interface SettingsType {
   soundEnabled: boolean;
   timestampsEnabled: boolean;
+  ttsEnabled: boolean;
+  autoPlay: boolean;
+  autoPlaySpeed: AutoPlaySpeed;
   theme: 'light' | 'dark' | 'system';
 }
 
